@@ -1,0 +1,169 @@
+1.使用mongo命令将数据库删除：
+use db_name;
+db.dropDatabase()
+
+2.导入（指定文件夹）数据：
+linux命令：mongorestore -d db_name 文件夹目录
+windows命令：mongorestore.exe -d db_name 文件夹目录
+
+导入：
+./mongoimport --help   
+
+导出：
+./mongoexport --help 
+
+netstat -aon|findstr "49157"
+tasklist|findstr "2720"
+
+windows 安装
+C:\mongodb\bin\mongod.exe --config "C:\mongodb\mongod.cfg" --install 
+D:\ProgramFiles\MongoDB\Server\3.6\bin\mongod --config "D:\ProgramFiles\MongoDB\Server\3.6\conf\mongodb.config" --install --serviceName "MongoDB"  ----管理员权限运行
+net start MongoDB
+net stop MongoDB
+C:\mongodb\bin\mongod.exe --remove
+
+命令行下运行 MongoDB 服务器 和 配置 MongoDB 服务 任选一个方式启动就可以。
+
+use runoob
+show dbs
+db.dropDatabase()
+db.createCollection(name, options)
+show tables  || show collections
+db.colleciton.drop()
+
+db.COLLECTION_NAME.insert(document)
+db.COLLECTION_NAME.find()
+
+db.COLLECTION_NAME.update(
+   <query>,
+   <update>,
+   {
+     upsert: <boolean>,
+     multi: <boolean>,
+     writeConcern: <document>
+   }
+)
+db.w.update({'title':'MongoDB 教程'},{$set:{'title':'MongoDB'}})
+db.w.find().pretty()
+updateOne  updateMany
+
+db.collection.save(
+   <document>,
+   {
+     writeConcern: <document>
+   }
+)
+db.collection.remove(
+   <query>,
+   <justOne>
+)
+deleteOne()  deleteMany()
+
+db.COLLECTION_NAME.deleteMany({})
+db.COLLECTION_NAME.remove({}) //清空
+
+db.collection.find(query, projection)
+
+(>) 大于 - $gt
+(<) 小于 - $lt
+(>=) 大于等于 - $gte
+(<= ) 小于等于 - $lte
+db.col.find({'likes':{$gt:100}})
+
+db.COLLECTION_NAME.find().limit(NUMBER)
+db.col.find({},{"title":1,_id:0}).limit(2)
+
+db.COLLECTION_NAME.find().limit(NUMBER).skip(NUMBER)
+
+db.COLLECTION_NAME.find().sort({KEY:1}) //1:asc -1:desc
+db.col.find({},{'title':1,'likes':1,'_id':0}).sort({"likes":-1})
+
+
+MongoDB使用 ensureIndex() 方法来创建索引。
+db.COLLECTION_NAME.ensureIndex({KEY:1})  //1:asc, -1:desc, "hashed"
+db.col.ensureIndex({"title":1,"likes":-1})
+后台：
+db.values.ensureIndex({open: 1, close: 1}, {background: true})
+
+db.user_tags.count()
+db.user_tags.countDocuments({})
+db.user_tags.aggregate( [
+   { $count: "_id" }
+])
+
+db.COLLECTION_NAME.aggregate(AGGREGATE_OPERATION)
+db.col.aggregate([{$group:{_id:"$by_user", num_tutorial:{$sum:1}}}])
+
+管道：     
+	$project：修改输入文档的结构。可以用来重命名、增加或删除域，也可以用于创建计算结果以及嵌套文档。
+    $match：用于过滤数据，只输出符合条件的文档。$match使用MongoDB的标准查询操作。
+    $limit：用来限制MongoDB聚合管道返回的文档数。
+    $skip：在聚合管道中跳过指定数量的文档，并返回余下的文档。
+    $unwind：将文档中的某一个数组类型字段拆分成多条，每条包含数组中的一个值。
+    $group：将集合中的文档分组，可用于统计结果。
+    $sort：将输入文档排序后输出。
+    $geoNear：输出接近某一地理位置的有序文档。
+	
+
+
+启动带副本mongodb service
+mongod --port "PORT" --dbpath "YOUR_DB_DATA_PATH" --replSet "REPLICA_SET_INSTANCE_NAME"
+mongod --port 27017 --dbpath "D:\set up\mongodb\data" --replSet rs0
+rs.initiate()来启动一个新的副本集；
+rs.conf()来查看副本集的配置；
+rs.status()副本集状态
+
+rs.add(HOST_NAME:PORT)
+rs.add("mongod1.net:27017")
+MongoDB中你只能通过主节点将Mongo服务添加到副本集中 
+db.isMaster() 判断当前运行的Mongo服务是否为主节点
+
+
+db.stats()
+sh.status()
+
+
+#指定testdb分片生效
+db.runCommand( { enablesharding :"testdb"});
+#指定数据库里需要分片的集合和片键
+db.runCommand( { shardcollection : "testdb.table1",key : {id: 1} } )
+db.runCommand( { shardcollection : "whsh.w",key : {did:"hashed"} } )
+db.runCommand({"shardcollection":"whsh.w","key":{"did" : "hashed"}})
+
+
+db.w.ensureIndex({"_id":1})
+db.runCommand({enablesharding :"whsh"})
+db.runCommand( { shardcollection : "whsh.w",key : {"_id":1} } )
+
+db.w.ensureIndex({"_id":"hashed"})
+db.runCommand({enablesharding :"whsh"})
+db.runCommand( { shardcollection : "whsh.w",key : {"_id":"hashed"} } )
+
+db.w.getIndexs()
+
+db.serverStatus().connections
+
+
+use config
+db.collections.remove( { _id: "whsh.w" } )
+db.chunks.remove( { ns: "whsh.w" } )
+db.locks.remove( { _id: "whsh.w" } )
+
+use admin
+db.runCommand("flushRouterConfig")
+
+snappy
+db.createCollection( "test", {storageEngine:{wiredTiger:{configString:'block_compressor=zlib'}}} )
+
+
+db.c2.drop()
+db.createCollection('c2')
+db.c2.ensureIndex({LOG_DATE: "hashed"})
+sh.shardCollection("mydb.c2", {"LOG_DATE": "hashed"})
+
+
+
+如果需要强行收回内存也不是没有办法：
+
+    重启mongod，或者调用 db.runCommand({closeAllDatabases:1})来清除内存
+    使用Linux命令清除缓存中的数据：echo 3 > /proc/sys/vm/drop_caches

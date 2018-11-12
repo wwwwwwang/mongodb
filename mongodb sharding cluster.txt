@@ -1,0 +1,220 @@
+    ip        主机            ConfigServer  Mongos   Shard1   Shard2   Shard3
+10.10.16.13  ban7opd03app01	  27027         27028    27029    27030    27031
+10.10.16.62  hadoop2          27027         27028    27029    27030    27031
+10.10.16.63  hadoop3          27027         27028    27029    27030    27031
+
+/home/wanghaishen  mongodb-linux-x86_64-4.0.3.tgz
+tar -zxvf mongodb-linux-x86_64-4.0.3.tgz
+mv mongodb-linux-x86_64-4.0.3 mongodb
+vi ~/.bashrc 
+export PATH=/home/wanghaishen/mongodb/bin:$PATH
+source ~/.bashrc
+mongo -version
+
+1.创建相关路径
+mkdir -p /home/wanghaishen/mongodb/{config,router,shard}
+mkdir -p /home/wanghaishen/mongodb/config/{data,logs}
+mkdir -p /home/wanghaishen/mongodb/router/logs
+mkdir -p /home/wanghaishen/mongodb/shard/{data,logs}
+mkdir -p /home/wanghaishen/mongodb/shard/data/{shard1,shard2,shard3}
+mkdir -p /home/wanghaishen/mongodb/shard/logs/{shard1,shard2,shard3}
+
+2.配置configServer
+cd /home/wanghaishen/mongodb/config
+vi configServer.conf
+
+net:
+  bindIp: 0.0.0.0
+  port: 27027
+processManagement:
+  fork: "true"
+replication:
+  replSetName: configRS
+sharding:
+  clusterRole: configsvr
+storage:
+  dbPath: /home/wanghaishen/mongodb/config/data
+systemLog:
+  destination: file
+  path: /home/wanghaishen/mongodb/config/logs/mongodb.log
+  
+scp configServer.conf hadoop1:/home/wanghaishen/mongodb/config
+scp configServer.conf hadoop2:/home/wanghaishen/mongodb/config
+
+3台机器上分别启动configServer
+mongod -f /home/wanghaishen/mongodb/config/configServer.conf
+mongod -f /home/wanghaishen/mongodb/config/configServer.conf
+mongod -f /home/wanghaishen/mongodb/config/configServer.conf
+
+mongo --host 10.10.16.63 --port 27027
+rs.initiate(
+  {
+    _id: "configRS",
+    configsvr: true,
+    members: [
+      { _id : 0, host : "ban7opd03app01:27027" },
+      { _id : 1, host : "hadoop2:27027" },
+      { _id : 2, host : "hadoop3:27027" }
+    ]
+  }
+)
+
+验证
+mongo --host 10.10.16.62 --port 27027
+rs.status()
+
+3.配置sharded服务
+
+cd /home/wanghaishen/mongodb/shard/data/shard1
+vi shard1.conf
+
+net:
+  bindIp: 0.0.0.0
+  port: 27029
+processManagement:
+  fork: "true"
+  pidFilePath: /home/wanghaishen/mongodb/shard/logs/shard1/shard1.pid
+replication:
+  replSetName: Shard_1
+sharding:
+  clusterRole: shardsvr
+storage:
+  dbPath: /home/wanghaishen/mongodb/shard/data/shard1
+  wiredTiger:
+    engineConfig:
+      cacheSizeGB: 3
+systemLog:
+  destination: file
+  path: /home/wanghaishen/mongodb/shard/logs/shard1/shard1.log
+
+cd /home/wanghaishen/mongodb/shard/data/shard2
+vi shard2.conf
+
+net:
+  bindIp: 0.0.0.0
+  port: 27030
+processManagement:
+  fork: "true"
+  pidFilePath: /home/wanghaishen/mongodb/shard/logs/shard2/shard2.pid
+replication:
+  replSetName: Shard_2
+sharding:
+  clusterRole: shardsvr
+storage:
+  dbPath: /home/wanghaishen/mongodb/shard/data/shard2
+  wiredTiger:
+    engineConfig:
+      cacheSizeGB: 3
+systemLog:
+  destination: file
+  path: /home/wanghaishen/mongodb/shard/logs/shard2/shard2.log
+  
+cd /home/wanghaishen/mongodb/shard/data/shard3
+vi shard3.conf
+
+net:
+  bindIp: 0.0.0.0
+  port: 27031
+processManagement:
+  fork: "true"
+  pidFilePath: /home/wanghaishen/mongodb/shard/logs/shard3/shard3.pid
+replication:
+  replSetName: Shard_3
+sharding:
+  clusterRole: shardsvr
+storage:
+  dbPath: /home/wanghaishen/mongodb/shard/data/shard3
+  wiredTiger:
+    engineConfig:
+      cacheSizeGB: 3
+systemLog:
+  destination: file
+  path: /home/wanghaishen/mongodb/shard/logs/shard3/shard3.log
+  
+ 
+ cd /home/wanghaishen/mongodb/shard/data
+ scp -r * hadoop2:/home/wanghaishen/mongodb/shard/data
+ scp -r * hadoop3:/home/wanghaishen/mongodb/shard/data
+ 
+3台机器上分别启动sharded服务
+mongod -f /home/wanghaishen/mongodb/shard/data/shard1/shard1.conf
+mongod -f /home/wanghaishen/mongodb/shard/data/shard2/shard2.conf
+mongod -f /home/wanghaishen/mongodb/shard/data/shard3/shard3.conf
+
+
+初始化sharded服务
+mongo --host 10.10.16.63 --port 27029
+rs.initiate({_id:"Shard_1",members:[{_id:1,host:"ban7opd03app01:27029",priority:2},{_id:2,host:"hadoop2:27029"},{_id:3,host:"hadoop3:27029"}]})
+
+mongo --host 10.10.16.63 --port 27030
+rs.initiate({_id:"Shard_2",members:[{_id:1,host:"ban7opd03app01:27030"},{_id:2,host:"hadoop2:27030",priority:2},{_id:3,host:"hadoop3:27030"}]})
+
+mongo --host 10.10.16.63 --port 27031
+rs.initiate({_id:"Shard_3",members:[{_id:1,host:"ban7opd03app01:27031"},{_id:2,host:"hadoop2:27031"},{_id:3,host:"hadoop3:27031",priority:2}]})
+
+
+4.配置Mongos服务
+cd /home/wanghaishen/mongodb/router
+vi mongos.conf
+
+net:
+  bindIp: 0.0.0.0
+  port: 27028
+processManagement:
+  fork: "true"
+  pidFilePath: /home/wanghaishen/mongodb/router/logs/mongos.pid
+sharding:
+  configDB: configRS/ban7opd03app01:27027,hadoop2:27027,hadoop3:27027
+systemLog:
+  destination: file
+  path: /home/wanghaishen/mongodb/router/logs/mongos.log
+
+scp mongos.conf hadoop2:/home/wanghaishen/mongodb/router
+scp mongos.conf hadoop3:/home/wanghaishen/mongodb/router
+
+3台机器上分别启动mongos服务
+mongos -f /home/wanghaishen/mongodb/router/mongos.conf
+
+配置分片，将主片添加至集群
+mongo --host 10.10.16.63 --port 27028
+
+//db.runCommand({"addShard":"Shard_1/ban7opd03app01:27029" ,"maxsize":1024})
+sh.addShard("Shard_1/ban7opd03app01:27029")
+
+//db.runCommand({"addShard":"Shard_2/hadoop2:27030" ,"maxsize":1024})
+sh.addShard("Shard_2/hadoop2:27030")
+
+//db.runCommand({"addShard":"Shard_3/hadoop3:27031" ,"maxsize":1024})
+sh.addShard("Shard_3/hadoop3:27031")
+
+sh.status()
+
+5.对库启用分片
+先创建一个数据库，然后再对数据库启动分片
+use madmax;
+sh.enableSharding("madmax")
+
+6.对数据库中的集合进行分片
+递增分片
+sh.shardCollection("<database>.<collection>", { <shard key> : <direction> } )
+use madmax
+db.user_tags.ensureIndex({"_id":1})
+sh.shardCollection("madmax.user_tags",{_id:1})
+hashed分片
+sh.shardCollection("<database>.<collection>", { <shard key> : "hashed" } )
+use madmax
+db.user_tags.ensureIndex({"_id":"hashed"})
+sh.shardCollection("madmax.user_tags",{_id:"hashed"})
+
+
+关闭：
+前台启动 ctrl+c
+后台启动
+1.shell-> use admin;  db.shutdownServer();
+2.mongod  --shutdown  --dbpath /database/mongodb/data/
+3.kill -2 PID 或者 kill -15 PID, 建议不要使用 kill -9 pid
+
+
+
+
+  
