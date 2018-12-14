@@ -214,7 +214,11 @@ sh.shardCollection("madmax.user_tags",{_id:"hashed"})
 2.mongod  --shutdown  --dbpath /database/mongodb/data/
 3.kill -2 PID 或者 kill -15 PID, 建议不要使用 kill -9 pid
 
-
+mongod -f /data/mongodb/config/configServer.conf
+mongod -f /data/mongodb/shard/data/shard1/shard1.conf
+mongod -f /data/mongodb/shard/data/shard2/shard2.conf
+mongod -f /data/mongodb/shard/data/shard3/shard3.conf
+mongos -f /data/mongodb/router/mongos.conf
 
 
   
